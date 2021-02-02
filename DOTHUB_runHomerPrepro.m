@@ -74,6 +74,7 @@ end
 hmr = load(nirsFileName,'-mat');
 
 % Overwrite hmr.SD with hmr.SD3D to match downstream Homer2 function calls
+SD2D = hmr.SD;
 hmr.SD = hmr.SD3D;
 
 % Load .cfg
@@ -199,8 +200,9 @@ delete(wb);
 SD3D = SD;
 nWavs = length(SD.Lambda);
 tmp = reshape(SD.MeasListAct,length(SD.MeasListAct)/nWavs,nWavs);
-tmp2 = any(tmp'==0)';
-SD3D.MeasListAct = repmat(tmp2,2,1);
+tmp2 = ~any(tmp'==0)';
+SD3D.MeasListAct = repmat(tmp2,nWavs,1);
+SD2D.MeasListAct = SD3D.MeasListAct;
 if fullFlag %Full timecourse is to be reconstructed
     dodRecon = dod;
     tRecon = t;
@@ -239,5 +241,8 @@ logData(2,:) = {'Derived from data: ', nirsFileName};
 logData(3,:) = {'Pre-processed using:', cfgFileName};
 
 %(preproFileName,logData,dod,tDOD,SD3D,s,dcAvg,dcAvgStd,tHRF)
-[prepro, preproFileName] = DOTHUB_writePREPRO(preproFileName,logData,dodRecon,tRecon,SD3D,hmr.s,dcAvg,dcAvgStd,tHRF,condNames);
+%Convert to uM
+dcAvg = 1e6*dcAvg;
+dcAvgStd = 1e6*dcAvgStd;
+[prepro, preproFileName] = DOTHUB_writePREPRO(preproFileName,logData,dodRecon,tRecon,SD3D,hmr.s,dcAvg,dcAvgStd,tHRF,condNames,SD2D);
 
