@@ -1,12 +1,12 @@
 % DOT-HUB toolbox Pipeline Example 1.
-
+%
 % What follows is an example of a wrapper script that employs the main 
 % steps of the toolbox. Most steps output variables into the work
 % space and also writes them out as the key file types, so you can comment 
 % out steps as you work through them and pick up where you left off, rather
 % than re-running every step. The whole script runs in ~12 minutes on a 2018
 % MacBook Pro with 16Gb RAM.
-
+%
 % Example 1 is the simplest application of the toolbox to LUMO data. It is
 % assumed that we have no subject-specific information about the position
 % of the optodes (and therefore 3D positioning information is derived from
@@ -36,9 +36,9 @@ cfgFileName = [filepath '/ExampleData/Example1/preproPipelineExample1.cfg'];
 
 %% Run Homer2 pre-processing pipeline using .cfg file. Alternatively you can run line by line (as per commented below).
 
-[prepro, preproFileName] = DOTHUB_runHomerPrepro(nirsFileName,cfgFileName);
+%[prepro, preproFileName] = DOTHUB_runHomerPrepro(nirsFileName,cfgFileName);
 
-%Equivalent line-by-line Homer2 calls and prepro write:
+% %%%%Equivalent line-by-line Homer2 calls and prepro write:
 % dod = hmrIntensity2OD(nirs.d);
 % SD3D = enPruneChannels(nirs.d,nirs.SD3D,ones(size(nirs.t)),[0 1e11],12,[0 100],0); 
 % 
@@ -58,7 +58,7 @@ cfgFileName = [filepath '/ExampleData/Example1/preproPipelineExample1.cfg'];
 % dc = dc*1e6; %Homer works in Molar by default, we use uMolar.
 % 
 % %Regress short channels
-% %dc = DOTHUB_hmrSSRegressionByChannel(dc,SD3D,11,1); %This is a custom SS regression script. 
+% dc = DOTHUB_hmrSSRegressionByChannel(dc,SD3D,12,1); %This is a custom SS regression script. 
 % 
 % %Block avg
 % [dcAvg,dcAvgStd,tHRF] = hmrBlockAvg(dc,nirs.s,nirs.t,[-5 25]);
@@ -102,7 +102,7 @@ basis = [30 30 30];
 
 %% Display peak response results on atlas surface and in volume
 timeRange = [10 15]; %seconds post-onset
-fs = length(dotimg.tImg)./range(dotimg.tImg);
+fs = length(dotimg.tImg)./DOTHUB_range(dotimg.tImg);
 frameRange = round((timeRange + abs(min(dotimg.tImg))).*fs);
 frames = frameRange(1):frameRange(2);
 DOTHUB_plotSurfaceDOTIMG(dotimg,origMeshFileName,frames,'condition',3,'view',[0 20]);
