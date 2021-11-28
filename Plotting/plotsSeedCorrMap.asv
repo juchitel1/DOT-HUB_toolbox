@@ -15,8 +15,8 @@ function [Fig1, corrcoeffs]=DOTHUB_selectseedCorrMap(dotimgFileName,gmSurfaceMes
                             % 1-6
 % Output: 
 % Fig 1                     % correlation map (pearson's R)
-% corrcoefs                 % correlation values for each node
-
+% Fig 2                     % Correlation map (in c
+% cor
 
 
 if ~exist('infantFlag','var')
