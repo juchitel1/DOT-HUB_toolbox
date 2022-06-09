@@ -23,12 +23,12 @@
 % saveFlag =            true if resulting SD file should be saved (default true)
 %
 % OUTPUTS: ###############################################################
-% SD_3D = The SD file containing the 3D information associated with polhemus
+% SD3D = The SD file containing the 3D information associated with polhemus
 % data. Also contains the a 'Landmarks' variable that saves the cranial
 % landmarks (Nz Iz Ar Al Cz). Also save out into an .SD file with a name
 % matching the input .csv appended with _3D.
 %
-% SD_3DFileName = Filename of the saved SD_3D variable.
+% SD3DFileName = Filename of the saved SD3D variable.
 %
 % RJC, UCL, December 2019
 %
@@ -93,22 +93,31 @@ wavelength2 = 850;
 %#########################################################################
 %#########################################################################
 %Load data
-delimiter = ',';
-startRow = 2;
-formatSpec = '%s%f%f%f%[^\n\r]';
-fileID = fopen(posCSVFileName,'r');
-dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'HeaderLines' ,startRow-1, 'ReturnOnError', false, 'EndOfLine', '\r\n');
-allPos = [dataArray{2} dataArray{3} dataArray{4}]*10; %Polhemus output in cm, convert to mm.%#################################################%#################################################%#################################################%#################################################
 
-%Crop out landmarks and polhemus measurement points
-landmarks = allPos(1:5,:);
-PolPoints = allPos(6:end,:);
+[~,~,ext] = fileparts(posCSVFileName);
+if strcmpi(ext,'.csv')
+    delimiter = ',';
+    startRow = 2;
+    formatSpec = '%s%f%f%f%[^\n\r]';
+    fileID = fopen(posCSVFileName,'r');
+    dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'HeaderLines' ,startRow-1, 'ReturnOnError', false, 'EndOfLine', '\r\n');
+    allPos = [dataArray{2} dataArray{3} dataArray{4}]*10; %Polhemus output in cm, convert to mm.%#################################################%#################################################%#################################################%#################################################
+
+    %Crop out landmarks and polhemus measurement points
+    landmarks = allPos(1:5,:);
+    PolPoints = allPos(6:end,:);
+elseif strcmpi(ext,'.txt')
+    tmp = importdata(posCSVFileName);
+    landmarks = tmp.data(1:5,:)*10;%Polhemus output in cm, convert to mm
+    PolPoints = tmp.data(6:end,:)*10;
+end
 
 if mod(size(PolPoints,1),3)~=0
     error('The selected .csv file does not seem to contain a multiple of 3 points as is expected for LUMO');
 else
     nTiles = size(PolPoints,1)/3;
 end
+
 %Define offsets vector
 if mixedFlag
     prompt = 'Enter nTile space-separated values of 1 (Adult) and 0 (Infant)';
@@ -134,17 +143,25 @@ end
 
 %Translate and Rotate so that Iz is at 0 0 0, Nz is at 0 y 0, Ar and Al have same z
 %value and Cz is on top
+
+%First rotate so that <Ar&AL> to Cz is +ve z;
+mnA = mean(landmarks([3 4],:));
+%set mnA to origin
+landmarks = landmarks - repmat(mnA,size(landmarks,1),1);
+PolPoints = PolPoints - repmat(mnA,size(PolPoints,1),1);
+Cz = landmarks(5,:);
+[azimuth,elevation,r] = cart2sph(Cz(1),Cz(2),Cz(3));
+landmarks = rotz(landmarks,-rad2deg(azimuth),[0 0 0]);
+PolPoints = rotz(PolPoints,-rad2deg(azimuth),[0 0 0]);
+landmarks = roty(landmarks,-(90-rad2deg(elevation)),[0 0 0]);
+PolPoints = roty(PolPoints,-(90-rad2deg(elevation)),[0 0 0]);
+
+%Shift so origin is at Iz
 Iz = landmarks(2,:);
 landmarks = landmarks - repmat(Iz,size(landmarks,1),1);
 PolPoints = PolPoints - repmat(Iz,size(PolPoints,1),1);
-Cz = landmarks(5,:);
-%Rotate Cz to be in +ve z;
-[azimuth,elevation,r] = cart2sph(Cz(1),Cz(2),Cz(3));
-landmarks = rotz(landmarks,90-rad2deg(azimuth),[0 0 0]);
-PolPoints = rotz(PolPoints,90-rad2deg(azimuth),[0 0 0]);
-landmarks = rotx(landmarks,-rad2deg(elevation),[0 0 0]);
-PolPoints = rotx(PolPoints,-rad2deg(elevation),[0 0 0]);
 
+%Rotate so Iz-Nz line is y axis
 Nz = landmarks(1,:);
 Iz = landmarks(2,:);
 Cz = landmarks(5,:);

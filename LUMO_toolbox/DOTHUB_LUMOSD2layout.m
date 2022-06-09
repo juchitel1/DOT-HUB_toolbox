@@ -2,9 +2,9 @@ function DOTHUB_LUMOSD2layout(SDinput2D,SDinput3D,groupid,outname)
 
 %This function takes a Homer2-style SD file or variable and outputs a LUMO 
 %layout file in .json format.
-
+%
 %############################### INPUTS ###################################
-
+%
 %SDinput2D  =   The path of an .SD file OR the SD variable containing 2D
 %               probe layout information (for visualization purposes)
 %SDinput3D  =   The path of an .SD file OR the SD variable containing 3D
@@ -13,10 +13,10 @@ function DOTHUB_LUMOSD2layout(SDinput2D,SDinput3D,groupid,outname)
 %               the 2D SD instead.
 %groupid    =   The intended group ID for this layout (in decimal).
 %               Defaults to 1
-
+%
 %outname    =   The intended output name for the new .json file. Default is
 %               'LUMO_LayoutFile_' datestr(clock) '.JSON'
-
+%
 %############################# Dependencies ###############################
 %This script uses the 'loadjson.m' function from jsonlab- 1.5, which is
 %available here: http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?jsonlab
@@ -43,6 +43,9 @@ if ischar(SDinput3D)
     if exist('SD','var')
         SD3D = SD; clear SD;
     end
+    if exist('SD_3D','var')
+        SD3D = SD_3D; clear SD_3D;
+    end
 elseif isstruct(SDinput3D)
     SD3D = SDinput3D;
 end
@@ -56,8 +59,23 @@ end
 
 % Define Outname
 if ~exist('outname','var')
-    outname = ['layout_' datestr(clock,'ddmmyyyyHHMMSS') '.json'];
+    if ischar(SDinput3D)
+        [path, name, ext] = fileparts(SDinput3D);
+        if isempty(path)
+            path = pwd;
+        end
+        outname = fullfile(path,[name '.json']);
+    else
+        outname = ['layout_' datestr(clock,'ddmmyyyyHHMM') '.json'];
+    end
+else
+    %Force extension
+    [path,name,ext] = fileparts(outname);
+    if ~strcmpi(ext,'.json')
+        outname = fullfile(path,[name '.json']);
+    end
 end
+    
 
 %Check both SD variables have same number of srcs and dets;
 if SD2D.nSrcs ~= SD3D.nSrcs || SD2D.nDets ~= SD3D.nDets
@@ -140,10 +158,13 @@ end
 
 jsonStr = jsonencode(jsonstruct);
 fid = fopen(outname, 'w');
-if fid == -1, error('Cannot create JSON file'); end
-fwrite(fid, jsonStr, 'char');
+if fid == -1
+    error('Cannot create JSON file'); 
+else
+    display(['Saving ' outname]);
+    fwrite(fid, jsonStr, 'char');
+end
 fclose(fid);
-
 
 
 

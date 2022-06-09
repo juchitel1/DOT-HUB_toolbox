@@ -4,7 +4,8 @@ function [nirs, nirsFileName, SD3DFileName] = DOTHUB_LUMO2nirs(lumoDIR,layoutFil
 %and (if it is not contained within the .LUMO - which it should be)
 %also loads the associated .JSON layout from a seperate file.
 
-%If subject-specific registration data (from polhemus or other method) is available
+%If subject-specific registration data (from polhemus or other method) is
+%availabledw
 %in .cvs format, this too can be parsd. If it is parsed, the function
 %DOTHUB_LUMOPolhemus2SD is called to determine optode positions from the
 %polhemus data. The resulting 3D optode positions overwrite the default 3D
@@ -132,25 +133,43 @@ if exist('eventsCSVFileName','var')
 end
 
 % LOAD DATA  ###############################################################
-%Load toml contents
+%Load metadata.toml contents
 disp('Loading .toml contents...');
 metadata = toml.read([lumoDIR '/metadata.toml']);
-recordingdata = toml.read([lumoDIR '/' metadata.file_names.recordingdata_file]); %To be updated to recording.toml
+
+%Load lumo_file_version
+%TODO: needs to be updated in the future, something like:
+%   if(lumoFileVersion.major > 1 OR
+%       (lumoFileVersion.major == 0 AND lumoFileVersion.minor >= 4))
+lumoFileVersion = split(metadata.lumo_file_version,'.');
+if(str2num(lumoFileVersion{2}) >= 4)
+    is040OrHigher = true;
+else
+    is040OrHigher = false;
+end
+
+%Call Regex function on recording & hardware files if not version 0.4.0
+if(is040OrHigher)
+    readRecording = @(filename) regexAndReadRecordingDataFile(filename);
+    readHardware = @(filename) regexAndReadHardwareFile(filename);
+else
+    readRecording = @(filename) toml.read(filename);
+    readHardware = @(filename) toml.read(filename);
+end
+
+%Loading other toml file contents
+recordingdata = readRecording([lumoDIR '/' metadata.file_names.recordingdata_file]); %To be updated to recording.toml
 events = toml.read([lumoDIR '/' metadata.file_names.event_file]);
 if isfield(metadata.file_names,'hardware_file') %Updated file naming structure
-    hardware = toml.read([lumoDIR '/' metadata.file_names.hardware_file]);
+    hardware = readHardware([lumoDIR '/' metadata.file_names.hardware_file]);
 elseif ~contains(metadata.file_names.layout_file,'json') %Old file naming structure (layout_file is hardware.toml!)
-    hardware = toml.read([lumoDIR '/' metadata.file_names.layout_file]);
+    hardware = readHardware([lumoDIR '/' metadata.file_names.layout_file]);
 else
     error('No hardware.toml or layout.toml found in LUMO directory');
 end
 
 %Load layout JSON
 layoutData = jsondecode(fileread(layoutFileName));
-
-%Load log file
-logFileID = fopen([lumoDIR '/' metadata.file_names.log_file]);
-logtxt = textscan(logFileID,'%s');
 
 %Load intensity binaries
 disp('Loading intensity data');
@@ -302,6 +321,12 @@ else %Assume 3D contents of layout file remains and save as SD3D
             SD3D.Landmarks(i,2) = layoutData.Landmarks(i).y;
             SD3D.Landmarks(i,3) = layoutData.Landmarks(i).z;
         end
+    elseif isfield(layoutData,'landmarks')  % for newer layout files
+        for i = 1:size(layoutData.landmarks,1)
+            SD3D.Landmarks(i,1) = layoutData.landmarks(i).x;
+            SD3D.Landmarks(i,2) = layoutData.landmarks(i).y;
+            SD3D.Landmarks(i,3) = layoutData.landmarks(i).z;
+        end
     end
     SD3DFileName = fullfile(lumoPath, [lumoName '_default.SD3D']);
     fprintf(['Saving SD3D to ' SD3DFileName ' ...\n']);
@@ -337,13 +362,24 @@ if eventsFileFlag %Read events from simple 2-column CSV file.
     
 else
     
-    %Now check if there are any serial events
+    %Versions before '0.4.0' had a bug were timestamps were printed as
+    %strings instead of numbers, in violation of the specification.
+    %An anonymous function was defined here to allow both old and new
+    %timestamps to be read correctly.
+    
+    if (is040OrHigher)
+        getTimeStamp = @(timeStamp) timeStamp * 1e-3; %to seconds
+    else
+        getTimeStamp = @(timeStamp) str2num(timeStamp)*1e-3; %to seconds
+    end
+    
+    %Now check if there are any events
     if isempty(fieldnames(events))
         s = zeros(size(t,1),1); %return empty s vector
         CondNames = {''};
     else
         for i = 1:size(events.events,2)
-            timeStamp(i) = str2num(events.events{1,i}.Timestamp)*1e-3; %to seconds
+            timeStamp(i) = getTimeStamp(events.events{1,i}.Timestamp);
             eventStr{i} = events.events{1,i}.name;
         end
         [tmp,~,occuranceInd] = unique(eventStr,'stable'); %find unique events, maintain order in which they occured
@@ -374,10 +410,10 @@ if n_zeros > 0
     if max(dists_3D) >= SDS_noise
         noisefloorest = mean(mnD(dists_3D>SDS_noise));
         d(d == 0) = noisefloorest;
-        disp(['Warning - zero intensity values have been converted to noise floor estimate'])
+        warning('Zero intensity values found: converted to noise floor estimate');
     else
         d(d == 0) = 1e-6;
-        disp(['Warning - zero intensity values have been converted to 1e-6'])
+        warning('Zero intensity values found: converted to 1e-6');
     end
 end
 
@@ -393,6 +429,58 @@ nirs.CondNames = CondNames;
 nirsFileName = fullfile(lumoPath, [lumoName '.nirs']);
 fprintf(['Saving file to ' nirsFileName ' ...\n']);
 save(nirsFileName,'-struct','nirs','-v7.3');
+end
 
 
 
+
+
+%%Nested functions
+
+function toml_data = regexAndReadHardwareFile(filename)
+%This function is meant to hardware toml files so that they are
+%readable by matlab-toml.
+%
+%Input should be the same as toml.read
+%
+%This functionality shouldn't be required, but matlab-toml has issues with
+%reading certain valid toml files.
+
+raw_text = fileread(filename);
+
+%Removes indentation within toml files.
+fixed_raw_text = regexprep(raw_text,'[\n\r]+[\t ]+','\n');
+
+toml_data = toml.decode(fixed_raw_text);
+end
+
+
+function toml_data = regexAndReadRecordingDataFile(filename)
+%This function is meant to recordingData toml files so that they are
+%readable by matlab-toml.
+%
+%Input should be the same as toml.read
+%
+%This functionality shouldn't be required, but matlab-toml has issues with
+%reading certain valid toml files.
+
+raw_text = fileread(filename);
+
+%Fixes arrays with new lines and indentation before numbers or opening
+%brackets.
+raw_text = regexprep(raw_text,'[\n\r]+[\t ]+([\d\[])','$1');
+
+%Fixes arrays with newlines before closing bracket.
+raw_text = regexprep(raw_text,'[\n\r]+\]',']');
+
+%Removes spaces between delimiters and numeric elements of an array.
+raw_text = regexprep(raw_text,'([^=]) +(\d+)','$1$2');
+
+%Removes spaces between numeric elements of an array and delimters.
+raw_text = regexprep(raw_text,'(\d+) +([^=])','$1$2');
+
+%Adds spaces between, delimiters and the numeric element that comes after.
+raw_text = regexprep(raw_text,',(.)',', $1');
+
+toml_data = toml.decode(raw_text);
+end

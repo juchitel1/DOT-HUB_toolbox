@@ -354,18 +354,24 @@ end
 %################ Create dotimg structure and write .dotimg #####################
 %##########################################################################
 if ~isfield(prepro,'fileName')
+    prepro.fileName = [];
     dotimgFileName = [];
     ds = datestr(now,'yyyymmDDHHMMSS');
-    prepro.fileName = [];
+    
 else 
     if isempty(prepro.fileName)
         dotimgFileName = [];
         ds = datestr(now,'yyyymmDDHHMMSS');
-        prepro.fileName = [];
     else
+        %Check path actually exists (perhaps it has moved)
         [pathstr, name, ~] = fileparts(prepro.fileName);
-        ds = datestr(now,'yyyymmDDHHMMSS');
-        dotimgFileName = fullfile(pathstr,[name '.dotimg']);
+        if isfolder(pathstr)
+            ds = datestr(now,'yyyymmDDHHMMSS');
+            dotimgFileName = fullfile(pathstr,[name '.dotimg']);
+        else
+            warning('The path found in prepro.filename does not exist. Did you move you files? The dotimg variable will be returned but no file will be saved. You can correct this by editing the prepro.filename to match the prepro file''s location');
+            dotimgFileName = [];
+        end
     end
 end
 
