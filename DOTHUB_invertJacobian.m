@@ -337,7 +337,7 @@ clear JJT;   % Clear for efficiency
 
 % #########################################################################
 % Create invjac filename. We want this to be identical to the jacFileName  
-[pathstr, name, ~] = fileparts(jac.fileName);
+[pathstr, name, ~] = fileparts(preproFileName);
 invjacFileName = fullfile(pathstr,[name '.invjac']);
 ds = datestr(now,'yyyymmDDHHMMSS');
 logData(1,:) = {'Created on: ', ds};
