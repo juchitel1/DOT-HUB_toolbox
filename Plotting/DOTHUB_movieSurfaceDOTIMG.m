@@ -1,4 +1,4 @@
-function DOTHUB_movieSurfaceDOTIMG(dotimg,rmap,saveName,varargin)
+function DOTHUB_movieSurfaceDOTIMG(dotimg,rmap,saveName,Framerate,varargin)
 
 % Takes dotimg and rmap/mshs files or structures and displays node-wise distribution on surface mesh
 %
@@ -83,7 +83,7 @@ for frame = 1:nFrames
     MovToWrite(frame) = getframe(f1);
 end
 v = VideoWriter(outname,'MPEG-4');
-v.FrameRate = 10;
+v.FrameRate = Framerate;
 open(v);
 writeVideo(v,MovToWrite);
 close(v);
